@@ -244,3 +244,5 @@ CELL_INDEX*
 *static_config.txt
 *dynamic_config.txt
 output_loop.txt
+
+output/
