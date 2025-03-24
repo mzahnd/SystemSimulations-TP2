@@ -1,6 +1,10 @@
 package ar.edu.itba.ss
 
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.yield
 import kotlin.math.abs
 
 private val logger = KotlinLogging.logger {}
@@ -25,9 +29,7 @@ private fun metropolis(column: Int, row: Int, grid: Grid, settings: Settings): V
     }
 }
 
-private fun simulationStep(settings: Settings): Grid {
-    val grid = Grid(settings)
-
+private fun simulationStep(grid: Grid, settings: Settings): Grid {
     // N^2 updates
     repeat(settings.gridSizeSquared) {
         val column = settings.random.nextInt(settings.gridSize)
@@ -40,28 +42,32 @@ private fun simulationStep(settings: Settings): Grid {
     return grid
 }
 
-private fun calculateMagnetization(monteCarloStep: Grid, settings: Settings): Double {
-    val sum = monteCarloStep.sum()
-    logger.debug { "sum: $sum" }
-    return abs(sum.toDouble() / settings.gridSizeSquared)
+private fun calculateMagnetization(monteCarloStep: Grid, settings: Settings): Double =
+    abs(monteCarloStep.sum().toDouble() / settings.gridSizeSquared)
+
+private suspend fun writeOutputToFile(
+    step: Int,
+    magnetization: Double,
+    grid: Grid,
+    settings: Settings,
+    dispatcher: CoroutineDispatcher = Dispatchers.IO
+) = withContext(dispatcher) {
+    val votes = StringBuilder()
+    grid.forEachRaw { vote -> votes.append(",$vote") }
+    settings.outputFile.appendText("$step,$magnetization,$votes\n")
 }
 
+suspend fun runSimulation(settings: Settings, dispatcher: CoroutineDispatcher = Dispatchers.Default) =
+    withContext(dispatcher) {
+        val grid = Grid(settings)
+        for (step in 0 until settings.steps) {
+            // N^2 updates
+            simulationStep(grid, settings)
+            // Calculate magnetization
+            val magnetization = calculateMagnetization(grid, settings)
 
-private fun writeOutputToFile(grid: Grid, magnetization: Double, settings: Settings) {
-    settings.outputFile.appendText("$magnetization")
-    grid.forEachRaw { vote ->
-        settings.outputFile.appendText(",$vote")
+            yield()
+            // Append in file
+            writeOutputToFile(step, magnetization, grid, settings)
+        }
     }
-    settings.outputFile.appendText("\n")
-}
-
-fun runSimulation(settings: Settings) {
-    repeat(settings.steps) {
-        // N^2 updates
-        val monteCarloStep = simulationStep(settings)
-        // Calculate magnetization
-        val magnetization = calculateMagnetization(monteCarloStep, settings)
-        // Append in file
-        writeOutputToFile(monteCarloStep, magnetization, settings)
-    }
-}

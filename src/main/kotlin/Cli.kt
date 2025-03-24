@@ -2,8 +2,13 @@ package ar.edu.itba.ss
 
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.parameters.options.*
-import com.github.ajalt.clikt.parameters.types.*
+import com.github.ajalt.clikt.parameters.types.double
+import com.github.ajalt.clikt.parameters.types.int
+import com.github.ajalt.clikt.parameters.types.long
+import com.github.ajalt.clikt.parameters.types.path
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import java.nio.file.Path
 import kotlin.random.Random
 
@@ -39,22 +44,28 @@ class Cli : CliktCommand() {
         logger.debug { "steps = $steps" }
         logger.debug { "seed = $seed" }
 
-        for (probability in probabilities) {
-            for (step in steps) {
-                val fileName = "n-${gridSize}_s-${step}_p-${probability}_seed-${seed}.csv"
+        runBlocking {
+            val allSettings: MutableList<Settings> = mutableListOf()
+            for (probability in probabilities) {
+                for (step in steps) {
+                    val fileName = "n-${gridSize}_s-${step}_p-${probability}_seed-${seed}.csv"
 
-                val settings = Settings(
-                    probability = probability,
-                    gridSize = gridSize,
-                    gridSizeSquared = gridSize * gridSize,
-                    steps = step,
-                    random = Random(seed),
-                    outputFile = outputDirectory.resolve(fileName).toFile()
-                )
-                logger.debug { "settings = $settings" }
+                    val settings = Settings(
+                        probability = probability,
+                        gridSize = gridSize,
+                        gridSizeSquared = gridSize * gridSize,
+                        steps = step,
+                        random = Random(seed),
+                        outputFile = outputDirectory.resolve(fileName).toFile()
+                    )
+                    logger.debug { "settings = $settings" }
 
-                runSimulation(settings)
+                    allSettings.add(settings)
+                }
             }
+
+            val simulationJobs = allSettings.map { settings -> launch { runSimulation(settings) } }
+            simulationJobs.forEach { it.join() }
         }
     }
 }
