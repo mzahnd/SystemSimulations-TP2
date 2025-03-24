@@ -64,8 +64,13 @@ class Cli : CliktCommand() {
                 }
             }
 
+            val startTime = System.currentTimeMillis()
             val simulationJobs = allSettings.map { settings -> launch { runSimulation(settings) } }
             simulationJobs.forEach { it.join() }
+            val endTime = System.currentTimeMillis()
+
+            val elapsedTime = endTime - startTime
+            logger.info { "Total elapsed time: $elapsedTime ms" }
         }
     }
 }
