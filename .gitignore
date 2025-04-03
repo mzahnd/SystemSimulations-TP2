@@ -126,6 +126,7 @@ bin/
 
 ### Animations ###
 animations/
+analysis/
 
 ### Outputs ###
 output/
