@@ -23,6 +23,14 @@ def extract_p_value(filename: str) -> float:
     raise ValueError(f"Could not determine p value from filename: {filename}")
 
 
+def extract_seed(filename: str) -> int:
+    """Extracts seed from the filename."""
+    match = re.search(r"seed-(\d+)", filename)
+    if match:
+        return int(match.group(1))
+    raise ValueError(f"Could not determine seed from filename: {filename}")
+
+
 def load_simulation_data(filepath: str, grid_size: int) -> tuple[list[np.ndarray], list[float], list[int]]:
     """Loads simulation data from a CSV file dynamically based on grid size."""
     df = pd.read_csv(filepath, header=None)
@@ -84,63 +92,105 @@ def detect_steady_state(magnetization: list[float], threshold: float = 0.001, wi
 
 def main():
     input_dir = "./output"
-    output_dir = "./analysis"
-    os.makedirs(output_dir, exist_ok=True)
+    output_base_dir = "./analysis"
+    os.makedirs(output_base_dir, exist_ok=True)
 
-    results = []
+    results_by_seed: dict[int, list[tuple[float, float, float]]] = {}
+
     for filename in os.listdir(input_dir):
         if filename.endswith(".csv"):
             filepath = os.path.join(input_dir, filename)
             grid_size = extract_grid_size(filename)
             p_value = extract_p_value(filename)
+            seed = extract_seed(filename)
+
+            output_dir = os.path.join(output_base_dir, f"seed-{seed}")
+            os.makedirs(output_dir, exist_ok=True)
+
             grids, magnetization, steps = load_simulation_data(filepath, grid_size)
 
             # Save magnetization plot
             plot_filename = os.path.join(output_dir, filename.replace(".csv", "_magnetization.png"))
             plot_magnetization(steps, magnetization, plot_filename)
-            print(f"Magnetization plot saved to {plot_filename}")
+            print(f"[seed {seed}] Magnetization plot saved to {plot_filename}")
 
-            # Check steady state
             if detect_steady_state(magnetization):
-                print(f"{filename}: System reached steady state ✅")
+                print(f"[seed {seed}] {filename}: System reached steady state ✅")
             else:
-                print(f"{filename}: System NOT in steady state ❌")
+                print(f"[seed {seed}] {filename}: System NOT in steady state ❌")
 
-            # Compute observables
             avg_M, chi = compute_observables(magnetization)
-            results.append((p_value, avg_M, chi))
+            results_by_seed.setdefault(seed, []).append((p_value, avg_M, chi))
 
-            # Generate animation
-            #animation_filename = os.path.join(output_dir, filename.replace(".csv", ".mp4"))
-            #animate_simulation(grids, animation_filename)
-            #print(f"Animation saved to {animation_filename}")
+            # Optional animation (uncomment to enable)
+            # animation_filename = os.path.join(output_dir, filename.replace(".csv", ".mp4"))
+            # animate_simulation(grids, animation_filename)
+            # print(f"Animation saved to {animation_filename}")
 
-    # Sort results by p-value
-    results.sort()
-    p_values, avg_M_values, chi_values = zip(*results)
+    # Plot observables per seed
+    for seed, results in results_by_seed.items():
+        results.sort()
+        p_values, avg_M_values, chi_values = zip(*results)
 
-    # Plot observables vs p
+        output_dir = os.path.join(output_base_dir, f"seed-{seed}")
+
+        plt.figure(figsize=(8, 5))
+        plt.plot(p_values, avg_M_values, marker="o", linestyle="-", label="<M>")
+        plt.xlabel("p")
+        plt.ylabel("<M>")
+        plt.legend()
+        plt.grid()
+        plt.title(f"Magnetization vs p (seed {seed})")
+        plt.savefig(os.path.join(output_dir, "magnetization_vs_p.png"))
+        plt.close()
+
+        plt.figure(figsize=(8, 5))
+        plt.plot(p_values, chi_values, marker="o", linestyle="-", color="r", label="χ")
+        plt.xlabel("p")
+        plt.ylabel("χ")
+        plt.legend()
+        plt.grid()
+        plt.title(f"Susceptibility vs p (seed {seed})")
+        plt.savefig(os.path.join(output_dir, "susceptibility_vs_p.png"))
+        plt.close()
+
+    # Compute average over seeds
+    seed_count = len(results_by_seed)
+    combined_results: dict[float, list[tuple[float, float]]] = {}
+    for seed_results in results_by_seed.values():
+        for p, m, chi in seed_results:
+            combined_results.setdefault(p, []).append((m, chi))
+
+    avg_output_dir = os.path.join(output_base_dir, "average")
+    os.makedirs(avg_output_dir, exist_ok=True)
+
+    avg_results = []
+    for p in sorted(combined_results.keys()):
+        m_vals = [x[0] for x in combined_results[p]]
+        chi_vals = [x[1] for x in combined_results[p]]
+        avg_results.append((p, np.mean(m_vals), np.mean(chi_vals)))
+
+    p_values, avg_M_values, chi_values = zip(*avg_results)
+
     plt.figure(figsize=(8, 5))
-    plt.plot(p_values, avg_M_values, marker="o", linestyle="-", label="<M>")
+    plt.plot(p_values, avg_M_values, marker="o", linestyle="-", label="⟨M⟩ (avg)")
     plt.xlabel("p")
-    plt.ylabel("<M>")
+    plt.ylabel("⟨M⟩")
     plt.legend()
     plt.grid()
-    plt.title("Magnetization vs p")
-    plt.savefig(os.path.join(output_dir, "magnetization_vs_p.png"))
+    plt.title("Average Magnetization vs p")
+    plt.savefig(os.path.join(avg_output_dir, "avg_magnetization_vs_p.png"))
     plt.close()
 
     plt.figure(figsize=(8, 5))
-    plt.plot(p_values, chi_values, marker="o", linestyle="-", color="r", label="χ")
+    plt.plot(p_values, chi_values, marker="o", linestyle="-", color="r", label="χ (avg)")
     plt.xlabel("p")
     plt.ylabel("χ")
     plt.legend()
     plt.grid()
-    plt.title("Susceptibility vs p")
-    plt.savefig(os.path.join(output_dir, "susceptibility_vs_p.png"))
+    plt.title("Average Susceptibility vs p")
+    plt.savefig(os.path.join(avg_output_dir, "avg_susceptibility_vs_p.png"))
     plt.close()
-
-    print("Analysis complete. Observables saved.")
 
 
 if __name__ == "__main__":
