@@ -1,10 +1,34 @@
 import os
 import re
+import math
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+import matplotlib.ticker as tick
 from tqdm import tqdm
+
+
+DPI = 100
+FIGSIZE=(1920 / DPI, 1080 / DPI)
+
+def y_fmt(x, pos):
+    """Format number as power of 10"""
+    if x == 0:
+        return "0"
+
+    # Get the base and exponent
+    base, exp = f"{x:.2e}".split("e")
+    base = float(base)
+    exp = int(exp)
+
+    # Check if the decimal part is zero (e.g. 1.00 → 1)
+    if round(base % 1, 2) == 0:
+        base_str = f"{int(base)}"
+    else:
+        base_str = f"{base:.2f}"
+    
+    return f"{base_str}x10^{exp}"
 
 
 def extract_grid_size(filename: str) -> int:
@@ -44,8 +68,11 @@ def load_simulation_data(filepath: str, grid_size: int) -> tuple[list[np.ndarray
 
 def animate_simulation(grids: list[np.ndarray], output_filename: str):
     """Generates an animation of the grid evolution with a progress bar."""
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=FIGSIZE)
     img = ax.imshow(grids[0], cmap='gray', vmin=-1, vmax=1)
+
+    ax.yaxis.set_major_formatter(tick.FuncFormatter(y_fmt))
+    ax.xaxis.set_major_formatter(tick.FuncFormatter(y_fmt))
 
     frames = len(grids)
     pbar = tqdm(total=frames, desc="Generating animation")
@@ -64,8 +91,8 @@ def animate_simulation(grids: list[np.ndarray], output_filename: str):
 def plot_magnetization(steps: list[int], magnetization: list[float], output_filename: str,
                        p_value: float, grid_size: int, seed: int):
     """Plots magnetization over time with proper formatting."""
-    plt.figure(figsize=(8, 5))
-    plt.plot(steps, magnetization, marker="o", linestyle="-", markersize=3)
+    plt.figure(figsize=FIGSIZE)
+    plt.plot(steps, magnetization, marker="o", linestyle="-", markersize=1)
     plt.xlabel("Paso de simulación", fontsize=20)
     plt.ylabel("Magnetización (adimensional)", fontsize=20)
     plt.tick_params(axis='both', labelsize=16)
@@ -74,6 +101,9 @@ def plot_magnetization(steps: list[int], magnetization: list[float], output_file
     ax = plt.gca()
     text = f"Parámetros:\n- Semilla: {seed}\n- Tamaño de grilla: {grid_size}x{grid_size}\n- Probabilidad p: {p_value}"
     plt.text(1.02, 0.5, text, transform=ax.transAxes, fontsize=14, va='center')
+ 
+    ax.yaxis.set_major_formatter(tick.FuncFormatter(y_fmt))
+    ax.xaxis.set_major_formatter(tick.FuncFormatter(y_fmt))
 
     plt.tight_layout()
     plt.savefig(output_filename)
@@ -99,7 +129,7 @@ def detect_steady_state(magnetization: list[float], threshold: float = 0.001, wi
 
 def plot_observable_vs_p(p_values, values, ylabel, filename, config_text):
     """General function to plot observables vs p with proper formatting."""
-    plt.figure(figsize=(8, 5))
+    plt.figure(figsize=FIGSIZE)
     plt.plot(p_values, values, marker="o", linestyle="-")
     plt.xlabel("Probabilidad p", fontsize=20)
     plt.ylabel(ylabel, fontsize=20)
@@ -108,6 +138,9 @@ def plot_observable_vs_p(p_values, values, ylabel, filename, config_text):
     # Add configuration information to the side
     ax = plt.gca()
     plt.text(1.02, 0.5, config_text, transform=ax.transAxes, fontsize=14, va='center')
+
+    ax.yaxis.set_major_formatter(tick.FuncFormatter(y_fmt))
+    ax.xaxis.set_major_formatter(tick.FuncFormatter(y_fmt))
 
     plt.tight_layout()
     plt.savefig(filename)
