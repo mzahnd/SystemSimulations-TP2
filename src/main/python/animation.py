@@ -12,8 +12,7 @@ from tqdm import tqdm
 DPI = 100
 FIGSIZE=(1920 / DPI, 1080 / DPI)
 
-def y_fmt(x, pos):
-    """Format number as power of 10"""
+def format_power_of_10(x):
     if x == 0:
         return "0"
 
@@ -29,6 +28,11 @@ def y_fmt(x, pos):
         base_str = f"{base:.2f}"
     
     return f"{base_str}x10^{exp}"
+
+
+def y_fmt(x, pos):
+    """Format number as power of 10"""
+    return format_power_of_10(x)
 
 
 def extract_grid_size(filename: str) -> int:
@@ -89,7 +93,7 @@ def animate_simulation(grids: list[np.ndarray], output_filename: str):
 
 
 def plot_magnetization(steps: list[int], magnetization: list[float], output_filename: str,
-                       p_value: float, grid_size: int, seed: int):
+                       p_value: float, grid_size: int, seed: int, mean_magnetization: float):
     """Plots magnetization over time with proper formatting."""
     plt.figure(figsize=FIGSIZE)
     plt.plot(steps, magnetization, marker="o", linestyle="-", markersize=1)
@@ -99,7 +103,7 @@ def plot_magnetization(steps: list[int], magnetization: list[float], output_file
 
     # Add configuration information to the side
     ax = plt.gca()
-    text = f"Parámetros:\n- Semilla: {seed}\n- Tamaño de grilla: {grid_size}x{grid_size}\n- Probabilidad p: {p_value}"
+    text = f"Parámetros:\n- Semilla: {seed}\n- Tamaño de grilla: {grid_size}x{grid_size}\n- Probabilidad p: {format_power_of_10(p_value)}\n- Magnetización promedio: {format_power_of_10(mean_magnetization)}"
     plt.text(1.02, 0.5, text, transform=ax.transAxes, fontsize=14, va='center')
  
     ax.yaxis.set_major_formatter(tick.FuncFormatter(y_fmt))
@@ -166,9 +170,11 @@ def main():
 
             grids, magnetization, steps = load_simulation_data(filepath, grid_size)
 
+            mean_magnetization = np.mean(magnetization)
+
             # Save magnetization plot
             plot_filename = os.path.join(output_dir, filename.replace(".csv", "_magnetization.png"))
-            plot_magnetization(steps, magnetization, plot_filename, p_value, grid_size, seed)
+            plot_magnetization(steps, magnetization, plot_filename, p_value, grid_size, seed, mean_magnetization)
             print(f"[seed {seed}] Magnetization plot saved to {plot_filename}")
 
             if detect_steady_state(magnetization):
