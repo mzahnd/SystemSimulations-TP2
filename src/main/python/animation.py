@@ -172,6 +172,10 @@ def main():
 
             mean_magnetization = np.mean(magnetization)
 
+            # output_filename = os.path.join(output_dir, filename.replace(".csv", ".mp4"))
+            # animate_simulation(grids, output_filename)
+            # print(f"Animation saved to {output_filename}")
+
             # Save magnetization plot
             plot_filename = os.path.join(output_dir, filename.replace(".csv", "_magnetization.png"))
             plot_magnetization(steps, magnetization, plot_filename, p_value, grid_size, seed, mean_magnetization)
