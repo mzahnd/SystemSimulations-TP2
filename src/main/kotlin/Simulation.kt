@@ -59,6 +59,8 @@ private suspend fun writeOutputToFile(
 
 suspend fun runSimulation(settings: Settings, dispatcher: CoroutineDispatcher = Dispatchers.Default) =
     withContext(dispatcher) {
+        val startTime = System.currentTimeMillis()
+
         val grid = Grid(settings)
         for (step in 0 until settings.steps) {
             // N^2 updates
@@ -70,4 +72,8 @@ suspend fun runSimulation(settings: Settings, dispatcher: CoroutineDispatcher = 
             // Append in file
             writeOutputToFile(step, magnetization, grid, settings)
         }
+
+        val endTime = System.currentTimeMillis()
+        val elapsedTime = endTime - startTime
+        logger.info { "Probability: ${settings.probability} | GridSize: ${settings.gridSize} | Elapsed time: $elapsedTime ms" }
     }
