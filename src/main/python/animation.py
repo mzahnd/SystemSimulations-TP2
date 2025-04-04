@@ -61,14 +61,21 @@ def animate_simulation(grids: list[np.ndarray], output_filename: str):
     pbar.close()
 
 
-def plot_magnetization(steps: list[int], magnetization: list[float], output_filename: str):
-    """Plots magnetization over time to visualize steady-state behavior."""
+def plot_magnetization(steps: list[int], magnetization: list[float], output_filename: str,
+                       p_value: float, grid_size: int, seed: int):
+    """Plots magnetization over time with proper formatting."""
     plt.figure(figsize=(8, 5))
     plt.plot(steps, magnetization, marker="o", linestyle="-", markersize=3)
-    plt.xlabel("Simulation Step")
-    plt.ylabel("Magnetization")
-    plt.title("Magnetization over time")
-    plt.grid()
+    plt.xlabel("Paso de simulación", fontsize=20)
+    plt.ylabel("Magnetización (adimensional)", fontsize=20)
+    plt.tick_params(axis='both', labelsize=16)
+
+    # Add configuration information to the side
+    ax = plt.gca()
+    text = f"Parámetros:\n- Semilla: {seed}\n- Tamaño de grilla: {grid_size}x{grid_size}\n- Probabilidad p: {p_value}"
+    plt.text(1.02, 0.5, text, transform=ax.transAxes, fontsize=14, va='center')
+
+    plt.tight_layout()
     plt.savefig(output_filename)
     plt.close()
 
@@ -88,6 +95,23 @@ def detect_steady_state(magnetization: list[float], threshold: float = 0.001, wi
     recent_values = magnetization[-window:]
     max_var = max(recent_values) - min(recent_values)
     return max_var < threshold
+
+
+def plot_observable_vs_p(p_values, values, ylabel, filename, config_text):
+    """General function to plot observables vs p with proper formatting."""
+    plt.figure(figsize=(8, 5))
+    plt.plot(p_values, values, marker="o", linestyle="-")
+    plt.xlabel("Probabilidad p", fontsize=20)
+    plt.ylabel(ylabel, fontsize=20)
+    plt.tick_params(axis='both', labelsize=16)
+
+    # Add configuration information to the side
+    ax = plt.gca()
+    plt.text(1.02, 0.5, config_text, transform=ax.transAxes, fontsize=14, va='center')
+
+    plt.tight_layout()
+    plt.savefig(filename)
+    plt.close()
 
 
 def main():
@@ -111,7 +135,7 @@ def main():
 
             # Save magnetization plot
             plot_filename = os.path.join(output_dir, filename.replace(".csv", "_magnetization.png"))
-            plot_magnetization(steps, magnetization, plot_filename)
+            plot_magnetization(steps, magnetization, plot_filename, p_value, grid_size, seed)
             print(f"[seed {seed}] Magnetization plot saved to {plot_filename}")
 
             if detect_steady_state(magnetization):
@@ -122,37 +146,27 @@ def main():
             avg_M, chi = compute_observables(magnetization)
             results_by_seed.setdefault(seed, []).append((p_value, avg_M, chi))
 
-            # Optional animation (uncomment to enable)
-            # animation_filename = os.path.join(output_dir, filename.replace(".csv", ".mp4"))
-            # animate_simulation(grids, animation_filename)
-            # print(f"Animation saved to {animation_filename}")
-
     # Plot observables per seed
     for seed, results in results_by_seed.items():
         results.sort()
         p_values, avg_M_values, chi_values = zip(*results)
-
         output_dir = os.path.join(output_base_dir, f"seed-{seed}")
 
-        plt.figure(figsize=(8, 5))
-        plt.plot(p_values, avg_M_values, marker="o", linestyle="-", label="<M>")
-        plt.xlabel("p")
-        plt.ylabel("<M>")
-        plt.legend()
-        plt.grid()
-        plt.title(f"Magnetization vs p (seed {seed})")
-        plt.savefig(os.path.join(output_dir, "magnetization_vs_p.png"))
-        plt.close()
+        config_text = f"Parámetros:\n- Semilla: {seed}\n- Tamaño de grilla: {grid_size}x{grid_size}"
 
-        plt.figure(figsize=(8, 5))
-        plt.plot(p_values, chi_values, marker="o", linestyle="-", color="r", label="χ")
-        plt.xlabel("p")
-        plt.ylabel("χ")
-        plt.legend()
-        plt.grid()
-        plt.title(f"Susceptibility vs p (seed {seed})")
-        plt.savefig(os.path.join(output_dir, "susceptibility_vs_p.png"))
-        plt.close()
+        plot_observable_vs_p(
+            p_values, avg_M_values,
+            "Magnetización promedio (adimensional)",
+            os.path.join(output_dir, "magnetization_vs_p.png"),
+            config_text
+        )
+
+        plot_observable_vs_p(
+            p_values, chi_values,
+            "Susceptibilidad (adimensional)",
+            os.path.join(output_dir, "susceptibility_vs_p.png"),
+            config_text
+        )
 
     # Compute average over seeds
     seed_count = len(results_by_seed)
@@ -172,28 +186,23 @@ def main():
 
     p_values, avg_M_values, chi_values = zip(*avg_results)
 
-    plt.figure(figsize=(8, 5))
-    plt.plot(p_values, avg_M_values, marker="o", linestyle="-", label="⟨M⟩ (avg)")
-    plt.xlabel("p")
-    plt.ylabel("⟨M⟩")
-    plt.legend()
-    plt.grid()
-    plt.title("Average Magnetization vs p")
-    plt.savefig(os.path.join(avg_output_dir, "avg_magnetization_vs_p.png"))
-    plt.close()
+    config_text = f"Parámetros:\n- Tamaño de grilla: {grid_size}x{grid_size}\n- Número de semillas: {seed_count}"
 
-    plt.figure(figsize=(8, 5))
-    plt.plot(p_values, chi_values, marker="o", linestyle="-", color="r", label="χ (avg)")
-    plt.xlabel("p")
-    plt.ylabel("χ")
-    plt.legend()
-    plt.grid()
-    plt.title("Average Susceptibility vs p")
-    plt.savefig(os.path.join(avg_output_dir, "avg_susceptibility_vs_p.png"))
-    plt.close()
+    plot_observable_vs_p(
+        p_values, avg_M_values,
+        "Magnetización promedio (adimensional)",
+        os.path.join(avg_output_dir, "avg_magnetization_vs_p.png"),
+        config_text
+    )
+
+    plot_observable_vs_p(
+        p_values, chi_values,
+        "Susceptibilidad (adimensional)",
+        os.path.join(avg_output_dir, "avg_susceptibility_vs_p.png"),
+        config_text
+    )
 
 
 if __name__ == "__main__":
     main()
-
 
